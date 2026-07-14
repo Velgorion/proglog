@@ -6,14 +6,22 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/stretchr/testify v1.11.1
 	github.com/tysonmote/gommap v0.0.3
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478
+	go.opencensus.io v0.24.0
+	go.uber.org/zap v1.28.0
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260713224248-f5fc221cf8c4
 	google.golang.org/grpc v1.82.0
 	google.golang.org/protobuf v1.36.11
 )
 
 require (
+	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
+	github.com/golang/protobuf v1.5.4 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+)
+
+require (
 	github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible // indirect
-	github.com/casbin/casbin v1.9.1 // indirect
+	github.com/casbin/casbin v1.9.1
 	github.com/cloudflare/cfssl v1.6.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -31,10 +39,10 @@ require (
 	github.com/weppos/publicsuffix-go v0.30.0 // indirect
 	github.com/zmap/zcrypto v0.0.0-20230310154051-c8b263fd8300 // indirect
 	github.com/zmap/zlint/v3 v3.5.0 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
-	golang.org/x/net v0.53.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/crypto v0.54.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 )
