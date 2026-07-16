@@ -42,7 +42,7 @@ gencert:
 					
 .PHONY: test
 test: $(CONFIG_PATH)/policy.csv $(CONFIG_PATH)/model.conf
-		go test -race ./... -cover
+		go test -v -race ./... -cover
 
 .PHONY: compile
 compile:
