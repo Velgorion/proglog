@@ -1,10 +1,13 @@
 package agent
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -16,12 +19,15 @@ import (
 	"github.com/Velgorion/proglog/internal/discovery"
 	"github.com/Velgorion/proglog/internal/log"
 	"github.com/Velgorion/proglog/internal/server"
+	"github.com/hashicorp/raft"
+	"github.com/soheilhy/cmux"
 )
 
 type Agent struct {
 	Config
 
-	log        *log.Log
+	mux        cmux.CMux
+	log        *log.DistributedLog
 	server     *grpc.Server
 	membership *discovery.Membership
 	replicator *log.Replicator
@@ -34,13 +40,19 @@ type Agent struct {
 type Config struct {
 	ServerTLSConfig *tls.Config
 	PeerTLSConfig   *tls.Config
-	DataDir         string
-	BindAddr        string
-	RPCPort         int
-	NodeName        string
-	StartJoinAddrs  []string
-	ACLModelFile    string
-	ACLPolicyFile   string
+	// DataDir stores the log and raft data.
+	DataDir string
+	// BindAddr is the address serf runs on.
+	BindAddr string
+	// RPCPort is the port for client (and Raft) connections.
+	RPCPort int
+	// Raft server id.
+	NodeName string
+	// Bootstrap should be set to true when starting the first node of the cluster.
+	StartJoinAddrs []string
+	ACLModelFile   string
+	ACLPolicyFile  string
+	Bootstrap      bool
 }
 
 func (c Config) RPCAddr() (string, error) {
@@ -57,6 +69,7 @@ func New(config Config) (*Agent, error) {
 		shutdowns: make(chan struct{}),
 	}
 	setup := []func() error{
+		a.setupMux,
 		a.setupLogger,
 		a.setupLog,
 		a.setupServer,
@@ -70,6 +83,19 @@ func New(config Config) (*Agent, error) {
 	return a, nil
 }
 
+func (a *Agent) setupMux() error {
+	rpcAddr := fmt.Sprintf(
+		":%d",
+		a.Config.RPCPort,
+	)
+	ln, err := net.Listen("tcp", rpcAddr)
+	if err != nil {
+		return err
+	}
+	a.mux = cmux.New(ln)
+	return nil
+}
+
 func (a *Agent) setupLogger() error {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
@@ -80,11 +106,32 @@ func (a *Agent) setupLogger() error {
 }
 
 func (a *Agent) setupLog() error {
-	var err error
-	a.log, err = log.NewLog(
-		a.Config.DataDir,
-		log.Config{},
+	raftLn := a.mux.Match(func(reader io.Reader) bool {
+		b := make([]byte, 1)
+		if _, err := reader.Read(b); err != nil {
+			return false
+		}
+		return bytes.Equal(b, []byte{byte(log.RaftRPC)})
+	})
+	logConfig := log.Config{}
+	logConfig.Raft.StreamLayer = log.NewStreamLayer(
+		raftLn,
+		a.Config.ServerTLSConfig,
+		a.Config.PeerTLSConfig,
 	)
+	logConfig.Raft.LocalID = raft.ServerID(a.Config.NodeName)
+	logConfig.Raft.Bootstrap = a.Config.Bootstrap
+	var err error
+	a.log, err = log.NewDistributedLog(
+		a.Config.DataDir,
+		logConfig,
+	)
+	if err != nil {
+		return err
+	}
+	if a.Config.Bootstrap {
+		err = a.log.WaitForLeader(3 * time.Second)
+	}
 	return err
 }
 
@@ -94,8 +141,9 @@ func (a *Agent) setupServer() error {
 		a.Config.ACLPolicyFile,
 	)
 	serverConfig := &server.Config{
-		CommitLog:  a.log,
-		Authorizer: authorizer,
+		CommitLog:   a.log,
+		Authorizer:  authorizer,
+		GetServerer: a.log,
 	}
 	var opts []grpc.ServerOption
 	if a.Config.ServerTLSConfig != nil {
@@ -109,7 +157,7 @@ func (a *Agent) setupServer() error {
 	}
 	rpcAddr, err := a.RPCAddr()
 	if err != nil {
-		return err	
+		return err
 	}
 	ln, err := net.Listen("tcp", rpcAddr)
 	if err != nil {
