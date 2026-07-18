@@ -28,7 +28,6 @@ func (r *Resolver) Build(
 	cc resolver.ClientConn,
 	opts resolver.BuildOptions,
 ) (resolver.Resolver, error) {
-
 	r.logger = zap.L().Named("resolver")
 	r.clientConn = cc
 	var dialOpts []grpc.DialOption
@@ -40,8 +39,13 @@ func (r *Resolver) Build(
 		fmt.Sprintf(`{"loadBalancingConfig":[{"%s":{}}]}`, Name),
 	)
 
+	addr := target.Endpoint()
+	if addr == "" {
+		addr = target.URL.Host
+	}
+
 	var err error
-	r.resolverConn, err = grpc.NewClient(target.URL.Host, dialOpts...)
+	r.resolverConn, err = grpc.NewClient(addr, dialOpts...)
 	if err != nil {
 		return nil, err
 	}

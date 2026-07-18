@@ -17,7 +17,7 @@ import (
 	"github.com/Velgorion/proglog/internal/loadbalance"
 	"github.com/Velgorion/proglog/internal/server"
 )
-	
+
 func TestResolver(t *testing.T) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)

@@ -16,6 +16,7 @@ import (
 	api "github.com/Velgorion/proglog/api/v1"
 	"github.com/Velgorion/proglog/internal/agent"
 	"github.com/Velgorion/proglog/internal/config"
+	"github.com/Velgorion/proglog/internal/loadbalance"
 )
 
 func TestAgent(t *testing.T) {
@@ -67,17 +68,14 @@ func TestAgent(t *testing.T) {
 		})
 		require.NoError(t, err)
 
+		t.Cleanup(func() {
+			require.NoError(t, agent.Shutdown())
+			require.NoError(t, os.RemoveAll(agent.Config.DataDir))
+		})
+
 		agents = append(agents, agent)
 	}
-	defer func() {
-		for _, agent := range agents {
-			err := agent.Shutdown()
-			require.NoError(t, err)
-			require.NoError(t,
-				os.RemoveAll(agent.Config.DataDir),
-			)
-		}
-	}()
+
 	time.Sleep(3 * time.Second)
 
 	leaderClient := client(t, agents[0], peerTLSConfig)
@@ -123,7 +121,8 @@ func client(
 	rpcAddr, err := agent.Config.RPCAddr()
 	require.NoError(t, err)
 	conn, err := grpc.NewClient(fmt.Sprintf(
-		"%s",
+		"%s:///%s",
+		loadbalance.Name,
 		rpcAddr,
 	), opts...)
 	require.NoError(t, err)
